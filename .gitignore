@@ -25,6 +25,8 @@ buildNumber.properties
 # Loggfiler
 *.log
 
+!lib/*.jar
+
 # Paketfiler
 *.jar
 *.war
