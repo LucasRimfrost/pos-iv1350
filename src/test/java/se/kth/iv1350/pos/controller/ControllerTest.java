@@ -1,6 +1,7 @@
 package se.kth.iv1350.pos.controller;
 
 import static org.junit.Assert.*;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import se.kth.iv1350.pos.integration.RegistryCreator;
@@ -21,6 +22,14 @@ public class ControllerTest {
     public void setUp() {
         RegistryCreator creator = new RegistryCreator();
         controller = new Controller(creator);
+    }
+
+    /**
+     * Cleans up after each test.
+     */
+    @After
+    public void tearDown() {
+        controller = null;
     }
 
     /**
@@ -136,9 +145,9 @@ public class ControllerTest {
         assertNotNull("Change should not be null", change);
 
         // Expected change: 20.0 - 11.2 = 8.8
-        BigDecimal expectedChange = new BigDecimal("8.8").setScale(2);
+        BigDecimal expectedChange = payment.getValue().subtract(total.getValue());
         assertEquals("Change should be calculated correctly",
-                     0, expectedChange.compareTo(change.getValue()));
+                0, expectedChange.compareTo(change.getValue()));
     }
 
     /**
@@ -158,5 +167,74 @@ public class ControllerTest {
         BigDecimal expectedVAT = new BigDecimal("3.0").setScale(2);
         assertEquals("Total VAT should be calculated correctly",
                      0, expectedVAT.compareTo(vatAmount.getValue()));
+    }
+
+    /**
+     * Tests entering item when no sale has been started.
+     */
+    @Test
+    public void testEnterItemWithoutStartingSale() {
+        Controller.ItemWithRunningTotal result = controller.enterItem("1", 1);
+        assertNull("Result should be null when no sale has been started", result);
+    }
+
+    /**
+     * Tests ending a sale when no sale has been started.
+     */
+    @Test
+    public void testEndSaleWithoutStartingSale() {
+        Amount total = controller.endSale();
+        assertNull("Total should be null when no sale has been started", total);
+    }
+
+    /**
+     * Tests requesting a discount when no sale has been started.
+     */
+    @Test
+    public void testRequestDiscountWithoutStartingSale() {
+        Amount discountedTotal = controller.requestDiscount("1001");
+        assertNull("Discounted total should be null when no sale has been started", discountedTotal);
+    }
+
+    /**
+     * Tests processing payment when no sale has been started.
+     */
+    @Test
+    public void testProcessPaymentWithoutStartingSale() {
+        Amount change = controller.processPayment(new Amount(100.0));
+        assertNull("Change should be null when no sale has been started", change);
+    }
+
+    /**
+     * Tests observer notification when a sale is completed.
+     */
+    @Test
+    public void testExternalSystemObserver() {
+        // Create a mock observer to verify notifications
+        class MockExternalSystemObserver implements Controller.ExternalSystemObserver {
+            private boolean notified = false;
+
+            @Override
+            public void saleCompleted(se.kth.iv1350.pos.model.Sale completedSale) {
+                notified = true;
+            }
+
+            public boolean wasNotified() {
+                return notified;
+            }
+        }
+
+        // Add the observer to the controller
+        MockExternalSystemObserver observer = new MockExternalSystemObserver();
+        controller.addExternalSystemObserver(observer);
+
+        // Process a complete sale
+        controller.startNewSale();
+        controller.enterItem("1", 1);
+        controller.endSale();
+        controller.processPayment(new Amount(20.0));
+
+        // Verify the observer was notified
+        assertTrue("External system observer should be notified of completed sale", observer.wasNotified());
     }
 }

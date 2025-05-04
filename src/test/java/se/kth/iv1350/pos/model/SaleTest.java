@@ -1,6 +1,7 @@
 package se.kth.iv1350.pos.model;
 
 import static org.junit.Assert.*;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import se.kth.iv1350.pos.dto.CustomerDTO;
@@ -26,6 +27,16 @@ public class SaleTest {
         sale = new Sale();
         testItem1 = new ItemDTO("1", "TestItem1", "Test item 1 description", new Amount(50.0), 0.25);
         testItem2 = new ItemDTO("2", "TestItem2", "Test item 2 description", new Amount(30.0), 0.12);
+    }
+
+    /**
+     * Cleans up the test environment after each test.
+     */
+    @After
+    public void tearDown() {
+        sale = null;
+        testItem1 = null;
+        testItem2 = null;
     }
 
     /**
@@ -136,5 +147,116 @@ public class SaleTest {
         Amount expectedChange = new Amount(37.5); // 100.0 - 62.5
 
         assertEquals("Change calculated incorrectly", expectedChange, change);
+    }
+
+    /**
+     * Tests updating inventory via the ItemRegistry.
+     */
+    @Test
+    public void testUpdateInventory() {
+        // Create a test mock of ItemRegistry
+        class MockItemRegistry extends ItemRegistry {
+            private boolean inventoryUpdated = false;
+            private List<SaleLineItem> lastItems = null;
+
+            @Override
+            public boolean updateInventoryForCompletedSale(List<SaleLineItem> saleItems) {
+                inventoryUpdated = true;
+                lastItems = saleItems;
+                return true;
+            }
+
+            public boolean wasInventoryUpdated() {
+                return inventoryUpdated;
+            }
+
+            public List<SaleLineItem> getLastItems() {
+                return lastItems;
+            }
+        }
+
+        // Setup test
+        sale.addItem(testItem1, 2);
+        MockItemRegistry mockRegistry = new MockItemRegistry();
+
+        // Execute test
+        boolean result = sale.updateInventory(mockRegistry);
+
+        // Verify results
+        assertTrue("Inventory update should succeed", result);
+        assertTrue("Inventory should be updated", mockRegistry.wasInventoryUpdated());
+        assertNotNull("Sale items should be passed to registry", mockRegistry.getLastItems());
+        assertEquals("Correct number of items should be passed", 1, mockRegistry.getLastItems().size());
+        assertEquals("Correct item should be passed", testItem1.getItemID(),
+                    mockRegistry.getLastItems().get(0).getItem().getItemID());
+    }
+
+    /**
+     * Tests printing a receipt via the Printer.
+     */
+    @Test
+    public void testPrintReceipt() {
+        // Create a test mock of Printer
+        class MockPrinter extends Printer {
+            private boolean receiptPrinted = false;
+            private Receipt lastReceipt = null;
+
+            @Override
+            public void printReceipt(Receipt receipt) {
+                receiptPrinted = true;
+                lastReceipt = receipt;
+            }
+
+            public boolean wasReceiptPrinted() {
+                return receiptPrinted;
+            }
+
+            public Receipt getLastReceipt() {
+                return lastReceipt;
+            }
+        }
+
+        // Setup test
+        sale.addItem(testItem1, 1);
+        CashPayment payment = new CashPayment(new Amount(100.0));
+        sale.pay(payment);
+        MockPrinter mockPrinter = new MockPrinter();
+
+        // Execute test
+        sale.printReceipt(mockPrinter);
+
+        // Verify results
+        assertTrue("Receipt should have been printed", mockPrinter.wasReceiptPrinted());
+        assertNotNull("Printer should receive a receipt", mockPrinter.getLastReceipt());
+    }
+
+    /**
+     * Tests that receipt printing doesn't happen if no payment has been made.
+     */
+    @Test
+    public void testPrintReceiptWithoutPayment() {
+        // Create a test mock of Printer
+        class MockPrinter extends Printer {
+            private boolean receiptPrinted = false;
+
+            @Override
+            public void printReceipt(Receipt receipt) {
+                receiptPrinted = true;
+            }
+
+            public boolean wasReceiptPrinted() {
+                return receiptPrinted;
+            }
+        }
+
+        // Setup test
+        sale.addItem(testItem1, 1);
+        MockPrinter mockPrinter = new MockPrinter();
+
+        // Execute test
+        sale.printReceipt(mockPrinter);
+
+        // Verify results
+        assertFalse("Receipt should not be printed before payment", mockPrinter.wasReceiptPrinted());
     }
 }
