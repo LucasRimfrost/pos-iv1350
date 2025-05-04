@@ -30,19 +30,24 @@ The application follows a layered architecture with Model-View-Controller (MVC) 
 To compile the project:
 ```bash
 make compile
+```
 
 To run unit tests:
 ```bash
 make test
+```
 
 To run the application:
 ```bash
 make run
+```
 
 To clean compiled files:
 ```bash
 make clean
+```
 
 For help with available commands:
 ```bash
 make help
+```
